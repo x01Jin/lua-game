@@ -6,8 +6,8 @@ local player = {
     level = 1,
     exp = 0,
     expToNextLevel = 100,
-    attackMin = 10,
-    attackMax = 20
+    attackMin = 20,
+    attackMax = 30
 }
 
 local monsterTemplate = {
@@ -89,7 +89,9 @@ end
 
 local function handleCommand(command)
     if command == "hunt" then
-        if player.health <= 0 then
+        if encounterPending ==true then
+            return "You can only use 'fight' or 'run' in this state."
+        elseif player.health <= 0 then
             return "You can't hunt while you're dead."
         end
         encounterPending = true
@@ -124,6 +126,8 @@ local function handleCommand(command)
         end
         encounterPending = false
         return "You ran away from the level " .. monster.level .. " " .. monster.name .. "."
+    elseif encounterPending == true then
+        return "You can only use 'fight' or 'run' in this state."
     elseif command == "rest" then
         if player.health <= 0 then
             return "You can't rest while you're dead."
