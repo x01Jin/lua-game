@@ -1,5 +1,3 @@
--- soriano alexander james
--- 
 local player = {
     health = 100,
     maxHealth = 100,
@@ -12,11 +10,10 @@ local player = {
     attackMax = 20
 }
 
--- si bogart
 local monsterTemplate = {
-    name = "Goblin",
-    baseAttackMin = 8,
-    baseAttackMax = 15
+    name = "Monster",
+    baseAttackMin = 3,
+    baseAttackMax = 5
 }
 
 local monster
@@ -32,8 +29,8 @@ local history = {}
 local input = ""
 local logScroll = 0
 local logHeight = 400
+local font
 
--- reset shit
 local function startCombat()
     playerHealth = player.health
     monsterHealth = monster.health
@@ -43,7 +40,6 @@ local function startCombat()
     combatTurn = 1
 end
 
--- turn based functionality
 local function combatTurnStep()
     if playerHealth > 0 and monsterHealth > 0 then
         local playerAttack = math.random(player.attackMin, player.attackMax)
@@ -65,7 +61,7 @@ local function combatTurnStep()
             player.gold = player.gold - goldLoss
             table.insert(combatLog, "Player was defeated by the " .. monster.name .. " and lost " .. goldLoss .. " gold.")
         else
-            player.health = playerHealth -- Update player's health after fucking
+            player.health = playerHealth
             local goldWon = math.random(30, 50)
             player.gold = player.gold + goldWon
             local expGained = math.max(10, (monster.level - player.level + 3) * 10)
@@ -76,7 +72,6 @@ local function combatTurnStep()
                 table.insert(combatLog, "Player found a potion.")
             end
 
-            -- Check for level up shit
             if player.exp >= player.expToNextLevel then
                 player.level = player.level + 1
                 player.exp = player.exp - player.expToNextLevel
@@ -88,13 +83,10 @@ local function combatTurnStep()
                 table.insert(combatLog, "Player leveled up to level " .. player.level .. "!")
             end
         end
-
-        -- Update player's health after fuckery
         player.health = math.max(0, playerHealth)
     end
 end
 
--- the fucking commands 
 local function handleCommand(command)
     if command == "hunt" then
         if player.health <= 0 then
@@ -153,14 +145,14 @@ local function handleCommand(command)
         if result <= 50 then
             return "You found nothing while exploring."
         elseif result <= 70 then
-            local goldFound = math.random(10, 30)
+            local goldFound = math.random(10, 75)
             player.gold = player.gold + goldFound
             return "You found " .. goldFound .. " gold while exploring."
         elseif result <= 90 then
             player.potions = player.potions + 1
             return "You found a potion while exploring."
         else
-            return "You encountered a merchant while exploring. Type 'accept' to buy a great potion for 500 gold or 'decline' to continue exploring."
+            return "You encountered a merchant! Type 'accept' 500 gold - great potion or 'decline' to continue exploring."
         end
     elseif command == "potion" then
         if player.health <= 0 then
@@ -191,15 +183,22 @@ local function handleCommand(command)
     elseif command == "exit" then
         love.event.quit()
     elseif command == "help" then
-        return "List of usable commands: hunt, fight, run, rest, explore, potion, status, accept, decline, restart, exit.\nInstructions: Hunt monsters based on your level, fight or run from encounters, rest to heal or get ambushed, explore for rewards, use potions for health, manage gold, and interact with merchants."
+        return "List of usable commands: hunt, rest, explore, potion, status, restart, and exit"
     else
         return "Invalid command."
     end
 end
 
--- Love2D shittery
 function love.load()
-    love.graphics.setFont(love.graphics.newFont(14))
+    font = love.graphics.newFont(14)
+    love.graphics.setFont(font)
+    logHeight = love.graphics.getHeight() - 100
+    input = ""
+    history = {}
+    logScroll = 0
+    combatInProgress = false
+    combatTimer = 0
+    combatLog = {}
 end
 
 function love.update(dt)
@@ -212,42 +211,60 @@ function love.update(dt)
                 table.insert(history, log)
             end
             combatLog = {}
-            -- Auto-scroll to the bottom (but still shit, needs fixing)
-            logScroll = math.max(0, #history * 20 - logHeight)
         end
     end
 end
 
 function love.draw()
-    love.graphics.setColor(0.2, 0.2, 0.2)
-    love.graphics.rectangle("fill", 10, 10, love.graphics.getWidth() - 20, logHeight)
-    
+    -- Draw the logs box
+    local logBoxX = 10
+    local logBoxY = 10
+    local logBoxWidth = love.graphics.getWidth() - 20
+    local logBoxHeight = logHeight
+
+    love.graphics.setColor(0.1, 0.1, 0.1)
+    love.graphics.rectangle("fill", logBoxX, logBoxY, logBoxWidth, logBoxHeight)
+
     love.graphics.setColor(1, 1, 1)
-    love.graphics.setScissor(10, 10, love.graphics.getWidth() - 20, logHeight)
+    love.graphics.setScissor(logBoxX, logBoxY, logBoxWidth, logBoxHeight)
     love.graphics.push()
     love.graphics.translate(0, -logScroll)
-    love.graphics.printf(table.concat(history, "\n"), 15, 15, love.graphics.getWidth() - 30)
+
+    local lineHeight = font:getHeight() + 5
+    local textWidth = logBoxWidth - 20
+
+    local totalLogHeight = #history * lineHeight
+
+    for i, log in ipairs(history) do
+        love.graphics.setColor(0.2, 0.2, 0.2)
+        love.graphics.rectangle("line", logBoxX, logBoxY + logBoxHeight - totalLogHeight + (i - 1) * lineHeight, logBoxWidth, lineHeight)
+        
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.printf(log, logBoxX + 5, logBoxY + logBoxHeight - totalLogHeight + (i - 1) * lineHeight, textWidth)
+    end
+
     love.graphics.pop()
     love.graphics.setScissor()
 
+    -- Draw the text input box
+    local inputBoxX = 10
+    local inputBoxY = love.graphics.getHeight() - 50
+    local inputBoxWidth = love.graphics.getWidth() - 20
+    local inputBoxHeight = 40
+
     love.graphics.setColor(0.2, 0.2, 0.2)
-    love.graphics.rectangle("fill", 10, love.graphics.getHeight() - 50, love.graphics.getWidth() - 20, 40)
+    love.graphics.rectangle("fill", inputBoxX, inputBoxY, inputBoxWidth, inputBoxHeight)
 
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("> " .. input, 15, love.graphics.getHeight() - 40, love.graphics.getWidth() - 30)
+    love.graphics.printf("> " .. input, inputBoxX + 5, inputBoxY + 5, inputBoxWidth - 10)
 end
 
 function love.keypressed(key)
     if key == "return" and not combatInProgress then
         table.insert(history, handleCommand(input))
         input = ""
-        logScroll = math.max(0, #history * 20 - logHeight)
     elseif key == "backspace" then
         input = input:sub(1, -2)
-    elseif key == "up" then
-        logScroll = math.max(0, logScroll - 20)
-    elseif key == "down" then
-        logScroll = math.min(#history * 20 - logHeight, logScroll + 20)
     end
 end
 
