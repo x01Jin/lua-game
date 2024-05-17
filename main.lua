@@ -25,6 +25,7 @@ local playerHealth
 local monsterHealth
 
 local encounterPending = false
+local merchantEncounter = false
 local history = {}
 local input = ""
 local logScroll = 0
@@ -88,15 +89,48 @@ local function combatTurnStep()
 end
 
 local function handleCommand(command)
-    if command == "hunt" then
-        if encounterPending ==true then
+    if combatInProgress then
+        return "Combat is in progress. Finish the fight first."
+    end
+
+    if encounterPending then
+        if command == "fight" then
+            encounterPending = false
+            startCombat()
+            return "Combat started against level " .. monster.level .. " " .. monster.name .. "!"
+        elseif command == "run" then
+            encounterPending = false
+            return "You ran away from the level " .. monster.level .. " " .. monster.name .. "."
+        else
             return "You can only use 'fight' or 'run' in this state."
-        elseif player.health <= 0 then
+        end
+    end
+
+    if merchantEncounter then
+        if command == "accept" then
+            if player.gold >= 500 then
+                player.gold = player.gold - 500
+                player.potions = player.potions + 1
+                merchantEncounter = false
+                return "You bought a great potion from the merchant."
+            else
+                return "You don't have enough gold."
+            end
+        elseif command == "decline" then
+            merchantEncounter = false
+            return "You declined the merchant's offer."
+        else
+            return "You can only use 'accept' or 'decline' in this state."
+        end
+    end
+
+    if command == "hunt" then
+        if player.health <= 0 then
             return "You can't hunt while you're dead."
         end
         encounterPending = true
         local monsterLevel
-        if player.level < 3 then
+        if player.level < 2 then
             monsterLevel = 0
         else
             if math.random() <= 0.7 then
@@ -113,21 +147,48 @@ local function handleCommand(command)
             attackMax = monsterTemplate.baseAttackMax + monsterLevel * 2
         }
         return "You encountered a level " .. monsterLevel .. " " .. monster.name .. ". Type 'fight' to fight or 'run' to run."
-    elseif command == "fight" then
-        if not encounterPending then
-            return "There is no monster to fight."
-        end
-        encounterPending = false
-        startCombat()
-        return "Combat started against level " .. monster.level .. " " .. monster.name .. "!"
-    elseif command == "run" then
-        if not encounterPending then
-            return "There is no monster to run from."
-        end
-        encounterPending = false
-        return "You ran away from the level " .. monster.level .. " " .. monster.name .. "."
-    elseif encounterPending == true then
-        return "You can only use 'fight' or 'run' in this state."
+    elseif command == "explore" then
+        return Wander(command)
+    elseif command == "status" then
+        return Commands(command)
+    elseif command == "rest" then
+        return Commands(command)
+    elseif command == "potion" then
+        return Commands(command)
+    elseif command == "restart" then
+        return Options(command)
+    elseif command == "exit" then
+        return Options(command)
+    elseif command == "help" then
+        return Options(command)
+    else
+        return "Invalid command. Type 'help' for a list of usable commands."
+    end
+end
+
+function Wander(command)
+    if player.health <= 0 then
+        return "You can't explore while you're dead."
+    end
+    local result = math.random(1, 100)
+    if result <= 50 then
+        return "You found nothing while exploring."
+    elseif result <= 70 then
+        local goldFound = math.random(10, 75)
+        player.gold = player.gold + goldFound
+        return "You found " .. goldFound .. " gold while exploring."
+    elseif result <= 90 then
+        player.potions = player.potions + 1
+        return "You found a potion while exploring."
+    else
+        merchantEncounter = true
+        return "You encountered a merchant! He offers a great potion for 500 gold 'accept'  or 'decline'?"
+    end
+end
+
+function Commands(command)
+    if command == "status" then
+        return "Health: " .. player.health .. "/" .. player.maxHealth .. ", Gold: " .. player.gold .. ", Potions: " .. player.potions .. ", Level: " .. player.level .. ", EXP: " .. player.exp .. "/" .. player.expToNextLevel
     elseif command == "rest" then
         if player.health <= 0 then
             return "You can't rest while you're dead."
@@ -141,23 +202,6 @@ local function handleCommand(command)
             player.health = math.min(player.maxHealth, player.health + math.random(10, 20))
             return "You rested and restored some health."
         end
-    elseif command == "explore" then
-        if player.health <= 0 then
-            return "You can't explore while you're dead."
-        end
-        local result = math.random(1, 100)
-        if result <= 50 then
-            return "You found nothing while exploring."
-        elseif result <= 70 then
-            local goldFound = math.random(10, 75)
-            player.gold = player.gold + goldFound
-            return "You found " .. goldFound .. " gold while exploring."
-        elseif result <= 90 then
-            player.potions = player.potions + 1
-            return "You found a potion while exploring."
-        else
-            return "You encountered a merchant! Type 'accept' 500 gold - great potion or 'decline' to continue exploring."
-        end
     elseif command == "potion" then
         if player.health <= 0 then
             return "You can't use a potion while you're dead."
@@ -169,27 +213,17 @@ local function handleCommand(command)
         else
             return "You don't have any potions."
         end
-    elseif command == "status" then
-        return "Health: " .. player.health .. "/" .. player.maxHealth .. ", Gold: " .. player.gold .. ", Potions: " .. player.potions .. ", Level: " .. player.level .. ", EXP: " .. player.exp .. "/" .. player.expToNextLevel
-    elseif command == "accept" then
-        if player.gold >= 500 then
-            player.gold = player.gold - 500
-            player.potions = player.potions + 1
-            return "You bought a great potion for 500 gold."
-        else
-            return "You don't have enough gold to buy the great potion."
-        end
-    elseif command == "decline" then
-        return "You declined the merchant's offer."
-    elseif command == "restart" then
+    end
+end
+
+function Options(command)
+    if command == "restart" then
         player.health = player.maxHealth
         return "You have been revived. Welcome back!"
     elseif command == "exit" then
         love.event.quit()
     elseif command == "help" then
         return "List of usable commands: hunt, rest, explore, potion, status, restart, and exit"
-    else
-        return "Invalid command."
     end
 end
 
