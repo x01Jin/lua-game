@@ -1,3 +1,5 @@
+local love = require("love")
+
 local player = {
     health = 100,
     maxHealth = 100,
